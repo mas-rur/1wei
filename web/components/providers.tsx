@@ -26,10 +26,10 @@ export function Providers({ children }: { children: ReactNode }) {
           accentColor: "#0052FF",
         },
         embeddedWallets: {
-          // Only spin up an embedded wallet for people who didn't bring one — someone
-          // who connects MetaMask shouldn't also get an embedded wallet they never asked for.
-          createOnLogin: "users-without-wallets",
-        },
+  ethereum: {
+    createOnLogin: "users-without-wallets",
+  },
+},
         defaultChain: base,
         supportedChains: [base, baseSepolia],
       }}
