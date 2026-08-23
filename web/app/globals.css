@@ -1,0 +1,150 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+/*
+  1wei design tokens.
+  ---------------------------------------------------------------------------
+  Palette is deliberately narrow: a deep navy (not neutral black) grounds the
+  page, Base's own brand blue (#0052FF) is the *only* accent used throughout
+  the interface, and a muted brass tone is reserved exclusively for the "1
+  wei" starting-point marker in the hero unit ladder — see components/home/
+  unit-ladder.tsx. Everywhere else, color is structural (blue = interactive/
+  connected, brass = "this is the atomic unit").
+*/
+:root {
+  --radius: 0.625rem;
+
+  /* Brand tokens */
+  --abyss: #0a0e16;
+  --abyss-raised: #121926;
+  --panel-muted: #161d2b;
+  --hairline: #1e2635;
+  --frost: #e7ebf2;
+  --mist: #7c8aa0;
+  --base-blue: #0052ff;
+  --base-blue-soft: #3b76ff;
+  --brass: #d4a537;
+  --destructive: #e5484d;
+
+  /* shadcn semantic tokens, mapped onto the brand palette above */
+  --background: var(--abyss);
+  --foreground: var(--frost);
+  --card: var(--abyss-raised);
+  --card-foreground: var(--frost);
+  --popover: var(--abyss-raised);
+  --popover-foreground: var(--frost);
+  --primary: var(--base-blue);
+  --primary-foreground: #ffffff;
+  --secondary: var(--panel-muted);
+  --secondary-foreground: var(--frost);
+  --muted: var(--panel-muted);
+  --muted-foreground: var(--mist);
+  --accent: var(--base-blue-soft);
+  --accent-foreground: #ffffff;
+  --destructive-foreground: #ffffff;
+  --border: var(--hairline);
+  --input: var(--hairline);
+  --ring: var(--base-blue);
+}
+
+@theme inline {
+  --font-display: var(--font-space-grotesk), ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-plex-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, SFMono-Regular, monospace;
+
+  --color-abyss: var(--abyss);
+  --color-abyss-raised: var(--abyss-raised);
+  --color-panel-muted: var(--panel-muted);
+  --color-hairline: var(--hairline);
+  --color-frost: var(--frost);
+  --color-mist: var(--mist);
+  --color-base-blue: var(--base-blue);
+  --color-base-blue-soft: var(--base-blue-soft);
+  --color-brass: var(--brass);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-body;
+    font-feature-settings: "cv11", "ss01";
+  }
+  /* Keep focus states visible for keyboard users everywhere — including on
+     the custom hero/nav elements that don't go through shadcn primitives. */
+  :focus-visible {
+    outline: 2px solid var(--base-blue);
+    outline-offset: 2px;
+  }
+}
+
+/* ---------------------------------------------------------------------
+   Hero unit-ladder animation (components/home/unit-ladder.tsx)
+   A single orchestrated reveal on load: each rung steps in from below,
+   and the "1 wei" rung at the base settles into a slow, quiet pulse —
+   the one deliberate glow on the page, reserved for the smallest unit.
+   Respects prefers-reduced-motion below.
+--------------------------------------------------------------------- */
+@keyframes rung-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes wei-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--brass) 35%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--brass) 0%, transparent);
+  }
+}
+
+.animate-rung-in {
+  animation: rung-in 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-wei-pulse {
+  animation: wei-pulse 2.4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-rung-in,
+  .animate-wei-pulse {
+    animation: none !important;
+  }
+}
