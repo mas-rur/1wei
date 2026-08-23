@@ -1,0 +1,15 @@
+# Foundry
+cache/
+out/
+broadcast/*/*/run-latest.json
+
+# Dependencies
+lib/
+
+# Env
+.env
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
