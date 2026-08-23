@@ -30,7 +30,7 @@ export default function ProfilePage() {
           <>
             <h1 className="font-display text-2xl font-semibold">Connect your wallet</h1>
             <p className="mx-auto mt-2 max-w-sm text-sm text-mist">
-              Your owned items, listings, and offers will show up here once you're connected.
+              Your owned items, listings, and offers will show up here once you&apos;re connected.
             </p>
             <Button className="mt-6" onClick={login}>
               Connect
