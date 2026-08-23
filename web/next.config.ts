@@ -21,6 +21,11 @@ const nextConfig: NextConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       "@coinbase/cdp-sdk": false,
+      // MetaMask SDK's React-Native-only session storage — irrelevant on web, where it
+      // falls back to browser storage regardless.
+      "@react-native-async-storage/async-storage": false,
+      // Privy's optional Farcaster Mini App + Solana support — unused here.
+      "@farcaster/mini-app-solana": false,
     };
     return config;
   },
