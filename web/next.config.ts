@@ -14,13 +14,13 @@ const nextConfig: NextConfig = {
   webpack: (config) => {
     // wagmi's built-in Coinbase "Base Account" connector (pulled in transitively via
     // @privy-io/wagmi, which we don't configure or use directly — Privy manages wallet
-    // connections itself) drags in @coinbase/cdp-sdk, which conditionally imports a
-    // Solana-specific payment sub-package that isn't installed as a real dependency.
-    // That code path is never reached in this app; stub it out so webpack's static
-    // analysis doesn't fail the whole build over an unused optional feature.
+    // connections itself) drags in @coinbase/cdp-sdk, which conditionally imports a whole
+    // family of per-chain payment sub-packages (@x402/evm, @x402/svm, @x402/core, ...) that
+    // aren't installed as real dependencies. None of that code path is ever reached in this
+    // app, so the whole package is stubbed out rather than chasing each sub-path individually.
     config.resolve.alias = {
       ...config.resolve.alias,
-      "@x402/svm/exact/client": false,
+      "@coinbase/cdp-sdk": false,
     };
     return config;
   },
