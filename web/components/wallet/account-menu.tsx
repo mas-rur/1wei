@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { usePrivy } from "@privy-io/react-auth";
-import { useAccount, useBalance } from "wagmi";
+import { useBalance } from "wagmi";
 import { Check, Copy, ExternalLink, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
