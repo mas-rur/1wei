@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { Menu, Search } from "lucide-react";
-import { Logomark } from "./logomark";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -15,7 +14,8 @@ export function Navbar() {
     <header className="sticky top-0 z-40 border-b border-border bg-abyss/90 backdrop-blur-md">
       <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex shrink-0 items-center gap-2 font-display text-lg font-semibold">
-          <Logomark className="text-base-blue" />
+          {/* eslint-disable-next-line @next/next/no-img-element -- logo.png dimensions aren't known ahead of time; a plain img avoids next/image's required width/height */}
+          <img src="/logo.png" alt={siteConfig.name} className="h-7 w-auto" />
           {siteConfig.name}
         </Link>
 
@@ -51,7 +51,8 @@ export function Navbar() {
             <SheetContent side="right" className="flex w-full flex-col gap-6 sm:max-w-xs">
               <SheetHeader>
                 <SheetTitle className="flex items-center gap-2">
-                  <Logomark className="text-base-blue" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/logo.png" alt={siteConfig.name} className="h-6 w-auto" />
                   {siteConfig.name}
                 </SheetTitle>
               </SheetHeader>
