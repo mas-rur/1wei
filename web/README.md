@@ -1,7 +1,7 @@
-# 1wei — Frontend (Phase 2)
+# 1wei — Frontend (Phases 2–3)
 
-Project setup, wallet connection (existing + embedded), navigation, and the dark visual
-identity everything else builds on.
+Project setup, wallet connection, navigation, and dark visual identity (Phase 2), plus the
+full on-chain trading loop wired to Phase 1's contracts (Phase 3).
 
 ## 1. Setup
 
@@ -13,112 +13,151 @@ cp .env.local.example .env.local
 
 Fill in `.env.local`:
 - `NEXT_PUBLIC_PRIVY_APP_ID` — create a free app at [dashboard.privy.io](https://dashboard.privy.io).
-  In the dashboard, set the allowed login methods (wallet, email, Google — matches the
-  `loginMethods` in `components/providers.tsx`) and restrict supported chains to Base +
-  Base Sepolia if you don't want Solana/other-chain options showing in the connect modal.
-- `NEXT_PUBLIC_MARKETPLACE_ADDRESS` / `NEXT_PUBLIC_COLLECTION_FACTORY_ADDRESS` — leave
-  blank for now; fill in once Phase 1's contracts are deployed. Phase 3 will read these.
+- `NEXT_PUBLIC_MARKETPLACE_ADDRESS` / `NEXT_PUBLIC_COLLECTION_FACTORY_ADDRESS` — from
+  deploying Phase 1's `script/Deploy.s.sol` to Base Sepolia. Nothing in Phase 3 works
+  without these — the app defaults to Base Sepolia (see the version note in
+  `components/providers.tsx`) since that's the only network Phase 1 is deployed to so far.
+- `PINATA_JWT` — server-only (no `NEXT_PUBLIC_` prefix). Create one at pinata.cloud → API
+  Keys. Used by `app/api/upload` and `app/api/upload-json` to pin images/metadata; never
+  reaches the browser.
 
 ```bash
 npm run dev
 ```
 
-### A version note
-
-The brief asked for Next.js 15. Next.js 16 is the current stable release as of this
-writing — the App Router fundamentals this project relies on haven't changed between the
-two, so I've scaffolded against the latest 15.x line as specified rather than bumping the
-major version without asking. `package.json` uses a `^15.4.0` range; swap it for `^16.0.0`
-if you'd rather start on the newest release.
+Add your own logo at `public/logo.png` — the navbar and footer both reference it directly
+(`components/layout/navbar.tsx`, `footer.tsx`). No particular size is assumed; it renders at
+a fixed height with natural aspect ratio.
 
 ---
 
-## 2. The wallet decision: Privy alone, not Privy + RainbowKit
+## 2. Phase 3: the trading loop
+
+Everything here talks to Phase 1's `Marketplace` and `CollectionFactory` contracts via wagmi
++ viem. No indexer yet (that's Phase 4) — every read is a direct, specific on-chain call.
+
+**Create a collection** (`/create`) — uploads a banner image + JSON metadata to IPFS, then
+calls `CollectionFactory.createCollection`. The deployed address is recovered from the
+`CollectionCreated` event on the confirmed receipt (not guessed at) via viem's
+`parseEventLogs`.
+
+**Mint** (`/mint/[collection]`) — same IPFS upload pattern, then `NFTCollection.mint`. Gated
+to the connected wallet being the collection's `owner()`. Lazy minting (the EIP-712 voucher
+flow, `NFTCollection.redeem`) is **not** built yet — normal upfront-gas minting only for now.
+
+**Trade an item** (`/item/[collection]/[tokenId]`) — reads `ownerOf`, `tokenURI`,
+`activeListingId`, and `activeAuctionId`, then renders whichever applies:
+- No listing/auction + you're the owner → choose fixed-price or auction, each gated behind
+  a one-time `setApprovalForAll` if not already approved.
+- Active listing → **Buy Now** (or **Cancel** if you're the seller).
+- Active auction → **Place Bid** (enforcing the contract's minimum increment), **Settle**
+  once ended (callable by anyone, matching the contract), or **Cancel** if you're the seller
+  and no bids have landed yet.
+- **Make an offer** is always available (WETH-denominated, approve-then-offer in one flow).
+  Accepting/cancelling a *specific* offer works by pasting its ID — there's no "see all
+  offers on this item" list yet, since that genuinely needs an indexer (Phase 4) to
+  discover offer IDs without scanning every `OfferCreated` event yourself.
+
+`/explore` (still a placeholder for the real filterable grid) got a manual
+collection-address + token-ID lookup form in the meantime, so there's *some* way to reach
+an item page without needing a link handed to you.
+
+**Shared plumbing:**
+- `lib/contracts/abis.ts` — hand-transcribed from the Phase 1 Solidity via viem's
+  `parseAbi`. If you change and redeploy a contract, update the matching ABI here — nothing
+  keeps these in sync automatically.
+- `lib/contracts/addresses.ts` / `hooks/use-contracts.ts` — per-chain address lookup, keyed
+  off whichever network the wallet is connected to.
+- `hooks/use-send-tx.ts` — every write action goes through this: submits via wagmi's
+  `useWriteContract`, tracks confirmation via `useWaitForTransactionReceipt`, toasts errors
+  consistently. Exposes the full `receipt` so callers can decode a specific event
+  (`CollectionCreated`, `Minted`, etc.) off its logs.
+- `lib/ipfs.ts` + `app/api/upload*` — Pinata's classic REST endpoints
+  (`pinFileToIPFS`/`pinJSONToIPFS`) called from server-side route handlers, so the JWT never
+  ships to the browser. Deliberately not using Pinata's SDK package — one less dependency
+  in a stack that's already proven fragile around version churn.
+
+---
+
+## 3. The wallet decision: Privy alone, not Privy + RainbowKit
 
 The brief listed "wagmi v2 + viem + RainbowKit (or Dynamic/Privy for embedded wallets)" —
 implying RainbowKit for external wallets and a separate embedded-wallet SDK bolted on
-alongside it. I used **Privy by itself** instead, for one reason: Privy's own connect
-modal already handles *both* jobs — "wallet" as a login method surfaces MetaMask, Rabby,
-Coinbase Wallet, and WalletConnect in one flow, and "email"/"google" create an embedded
-wallet on the spot. Running RainbowKit next to it would mean two separate connect modals
-and two wallet-state sources to keep in sync, for a solo-maintained project. See
-`components/providers.tsx` — one `loginMethods` array covers the whole brief.
+alongside it. I used **Privy by itself** instead: Privy's own connect modal already handles
+*both* jobs — "wallet" as a login method surfaces MetaMask, Rabby, Coinbase Wallet, and
+WalletConnect in one flow, and "email"/"google" create an embedded wallet on the spot.
+Running RainbowKit next to it would mean two separate connect modals and two wallet-state
+sources to keep in sync, for a solo-maintained project.
 
 `@privy-io/wagmi`'s `WagmiProvider` (not the one from plain `wagmi`) is what keeps wagmi's
-account state in sync with Privy's connectors — `lib/wagmi.ts` and `components/providers.tsx`
-both import from `@privy-io/wagmi` for this reason; it's an easy one-letter-different import
-to get wrong.
-
-`components/wallet/connect-button.tsx` and `account-menu.tsx` are the only two files that
-know about Privy specifically (`usePrivy()` for `login`/`logout`/`authenticated`, wagmi's
-own `useAccount`/`useBalance` for everything else) — swapping wallet providers later would
-be contained to those two files plus `providers.tsx`.
+account state in sync with Privy's connectors — an easy one-letter-different import to get
+wrong, so it's called out in comments everywhere it's used.
 
 ---
 
-## 3. Design system
+## 4. Design system
 
-**Palette** — a deep navy (`#0A0E16`, not neutral black) grounds the page. Base's own
-brand blue (`#0052FF`) is the *only* interactive accent, used for buttons, links, and the
-unit-ladder bars. A muted brass (`#D4A537`) is reserved exclusively for the "1 wei" marker
-in the hero — it doesn't appear anywhere else in the interface, so it stays meaningful
-instead of decorative. All tokens live in `app/globals.css`.
+**Palette** — a deep navy (`#0A0E16`, not neutral black) grounds the page. Base's own brand
+blue (`#0052FF`) is the *only* interactive accent. A muted brass (`#D4A537`) is reserved
+exclusively for the "1 wei" marker in the hero unit ladder. All tokens live in
+`app/globals.css`.
 
-**Type** — Space Grotesk for display headings (a grotesk with enough engineered character
-to suit a "precision denomination" brand without tipping into novelty), IBM Plex Sans for
-body copy, IBM Plex Mono for anything numeric or address-like (prices, token IDs, wallet
-addresses, the unit-ladder exponents). Loaded via `next/font/google` in `app/layout.tsx`.
+**Type** — Space Grotesk (display), IBM Plex Sans (body), IBM Plex Mono (anything numeric
+or address-like — prices, token IDs, wallet addresses). Loaded via `next/font/google` in
+`app/layout.tsx`.
 
-**Signature element** — `components/home/unit-ladder.tsx`: the real Ethereum denomination
-ladder (wei → kwei → mwei → gwei → microether → milliether → ether), bar width tapering
-down to a highlighted, gently pulsing "wei" rung at the base. It's the literal shape of
-"start from 1wei," not a generic stat block — and it's the only place motion happens on
-the page beyond hover states, so it doesn't compete with itself.
+**Signature element** — `components/home/unit-ladder.tsx`, the real Ethereum denomination
+ladder tapering down to a highlighted "wei" rung. The one place motion happens on the page
+beyond hover states.
 
-Tailwind v4 is configured CSS-first (`app/globals.css` — no `tailwind.config.js`); shadcn's
-usual primitives (Button, Input, Avatar, DropdownMenu, Sheet, Separator, Skeleton, Badge)
-are hand-written in `components/ui/` against that same token set rather than pulled via the
-CLI, since this sandbox can't reach npm. They're straightforward Radix + `cva` + `cn()` —
-running `npx shadcn@latest add <component>` later for anything new will match the existing
-`components.json` config.
+Tailwind v4 is configured CSS-first (`app/globals.css`, no `tailwind.config.js`); shadcn's
+primitives are hand-written in `components/ui/` against that token set. `npx shadcn@latest
+add <component>` for anything new will match the existing `components.json`.
 
 ---
 
-## 4. What's here
+## 5. What's here
 
 ```
 app/
-  layout.tsx          Root layout: fonts, metadata, Providers, Navbar/Footer shell
-  page.tsx             Home: Hero + Features
-  globals.css          Tailwind v4 theme — palette, fonts, hero keyframes
-  explore/, create/,   Placeholder pages so nav links resolve — built out in
-  profile/page.tsx     Phase 3 (create) and Phase 4 (explore, profile)
+  layout.tsx                       Root layout: fonts, metadata, Providers, Toaster, nav/footer
+  page.tsx                         Home: Hero + Features
+  globals.css                      Tailwind v4 theme
+  create/page.tsx                  Create a collection
+  mint/[collection]/page.tsx       Mint into a collection you own
+  item/[collection]/[tokenId]/     Trade an item — list/buy/auction/bid/offer
+  explore/page.tsx                 Placeholder + manual item lookup
+  profile/page.tsx                 Placeholder, gated on connection
+  api/upload/, api/upload-json/    Server-side Pinata pinning routes
 
 components/
-  providers.tsx        Privy + wagmi + react-query provider tree
-  wallet/              connect-button.tsx, account-menu.tsx
-  layout/              navbar.tsx, footer.tsx, logomark.tsx
-  home/                hero.tsx, features.tsx, unit-ladder.tsx
-  ui/                  Hand-written shadcn-style primitives
+  providers.tsx                    Privy + wagmi + react-query
+  wallet/, layout/, home/          Phase 2 pieces (connect button, nav, hero, etc.)
+  trading/                         create-listing-form, create-auction-form, listing-panel,
+                                    auction-panel, offer-panel
+  ui/                               shadcn-style primitives (added: textarea, label, sonner)
 
 lib/
-  wagmi.ts             wagmi config (Base + Base Sepolia) via @privy-io/wagmi
-  site-config.ts        Nav links, site metadata, external links
-  utils.ts             cn() helper
+  contracts/abis.ts, addresses.ts   ABIs + per-chain addresses
+  wagmi.ts, site-config.ts, utils.ts
+  ipfs.ts, metadata.ts              IPFS upload helpers + tokenURI metadata fetching
+
+hooks/
+  use-contracts.ts, use-send-tx.ts
 ```
 
 ---
 
-## 5. What's deliberately not here yet
+## 6. What's deliberately not here yet
 
-- **Contract reads/writes** — `lib/wagmi.ts` is configured for Base + Base Sepolia, but no
-  component calls the Marketplace or CollectionFactory yet. That's Phase 3.
-- **Real data on Explore/Profile** — both are placeholders gated appropriately (Profile
-  already checks connection status live; Explore doesn't need to yet).
-- **Light mode** — the CSS is structured so it wouldn't be hard to add
-  (`@custom-variant dark` is already in place), but the brief asked for a dark UI and a
-  toggle is one more thing for a solo dev to maintain, so it's out for now.
+- **Lazy minting** — the EIP-712 voucher signing/redemption flow from Phase 1's
+  `NFTCollection.redeem`. Needs its own design pass (how vouchers get stored/shared before
+  redemption) rather than bolting it on here.
+- **Offer discovery** — accepting/cancelling a known offer ID works; browsing "all offers on
+  this item" needs an indexer. Phase 4.
+- **Explore/Profile/Activity as real pages** — Phase 4, once indexing exists.
+- **Light mode** — the CSS supports adding it, but it's out of scope by choice.
 
 ---
 
-Ready for feedback before moving to Phase 3 (Core Trading UI: mint, list, auction, offer, buy).
+Ready for feedback before Phase 4 (Explore, Collection pages, Profile, Activity feed).
