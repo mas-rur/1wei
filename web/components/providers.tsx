@@ -26,12 +26,19 @@ export function Providers({ children }: { children: ReactNode }) {
           accentColor: "#0052FF",
         },
         embeddedWallets: {
-  ethereum: {
-    createOnLogin: "users-without-wallets",
-  },
-},
-        defaultChain: base,
-        supportedChains: [base, baseSepolia],
+          // Only spin up an embedded wallet for people who didn't bring one — someone
+          // who connects MetaMask shouldn't also get an embedded wallet they never asked
+          // for. Nested under `ethereum` since Privy configures this per chain type
+          // (we don't touch `solana` — this app is Base/EVM-only).
+          ethereum: {
+            createOnLogin: "users-without-wallets",
+          },
+        },
+        // Base Sepolia is the default for now — Phase 1's contracts are only deployed
+        // there so far. Switch this to `base` once you deploy to mainnet (and fill in
+        // the *_MAINNET address env vars in lib/contracts/addresses.ts).
+        defaultChain: baseSepolia,
+        supportedChains: [baseSepolia, base],
       }}
     >
       <QueryClientProvider client={queryClient}>
